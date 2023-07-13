@@ -1,8 +1,5 @@
 pipeline {
     agent any
-    tools{
-        maven 'maven_3_5_0'
-    }
     stages{
         stage('Build Maven'){
             steps{
@@ -13,7 +10,8 @@ pipeline {
         stage('Build docker image'){
             steps{
                 script{
-                    sh 'docker build -t surjeetaxis/surjeetjenkins .'
+                    sh 'docker build -t surjeetjenkins:1.0 .'
+                    sh 'docker tag surjeetjenkins:1.0 surjeetcse/surjeetjenkins:1.0'
                 }
             }
         }
@@ -23,14 +21,7 @@ pipeline {
                    withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'dockerhubpwd')]) {
                      sh 'docker login -u surjeetcse -p ${dockerhubpwd}'
                    }
-                   sh 'docker push surjeetaxis/surjeetjenkins'
-                }
-            }
-        }
-        stage('Deploy to k8s'){
-            steps{
-                script{
-                    kubernetesDeploy (configs: 'deploymentservice.yaml',kubeconfigId: 'k8sconfigpwd')
+                   sh 'docker push surjeetcse/surjeetjenkins:1.0'
                 }
             }
         }
