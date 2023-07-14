@@ -26,11 +26,11 @@ pipeline {
             }
         }
         stage('Deploy to k8s'){
-                    steps{
-                        script{
-                            kubernetesDeploy (configs: 'deploymentservice.yaml',kubeconfigId: 'k8sconfigpwd')
-                        }
-                    }
+            steps{
+                script{
+                    kubernetesDeploy (configs: 'deployment.yaml',kubeconfigId: 'kube8pwd')
                 }
+            }
+        }
     }
 }
