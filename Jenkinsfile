@@ -1,36 +1,112 @@
-pipeline {
+@Library('my-shared-library') _
+
+pipeline{
+
     agent any
+
+    parameters{
+
+        choice(name: 'action', choices: 'create\ndelete', description: 'Choose create/Destroy')
+        string(name: 'ImageName', description: "name of the docker build", defaultValue: 'javapp')
+        string(name: 'ImageTag', description: "tag of the docker build", defaultValue: 'v1')
+        string(name: 'DockerHubUser', description: "name of the Application", defaultValue: 'vikashashoke')
+    }
+
     stages{
-        stage('Build Maven'){
+         
+        stage('Git Checkout'){
+                    when { expression {  params.action == 'create' } }
             steps{
-                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/surjeetaxis/surjeetjenkins.git/']])
-                sh 'mvn clean install'
+            gitCheckout(
+                branch: "main",
+                url: "https://github.com/vikash-kumar01/mrdevops_java_app.git"
+            )
             }
         }
-        stage('Build docker image'){
+         stage('Unit Test maven'){
+         
+         when { expression {  params.action == 'create' } }
+
             steps{
-                script{
-                    sh 'docker build -t surjeetjenkins:1.0 .'
-                    sh 'docker tag surjeetjenkins:1.0 surjeetcse/surjeetjenkins:1.0'
-                }
+               script{
+                   
+                   mvnTest()
+               }
             }
         }
-        stage('Push image to Hub'){
+         stage('Integration Test maven'){
+         when { expression {  params.action == 'create' } }
             steps{
-                script{
-                   withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'dockerhubpwd')]) {
-                     sh 'docker login -u surjeetcse -p ${dockerhubpwd}'
-                   }
-                   sh 'docker push surjeetcse/surjeetjenkins:1.0'
-                }
+               script{
+                   
+                   mvnIntegrationTest()
+               }
             }
         }
-        stage('Deploy to k8s'){
+        stage('Static code analysis: Sonarqube'){
+         when { expression {  params.action == 'create' } }
             steps{
-                script{
-                    kubernetesDeploy (configs: 'deployment.yaml',kubeconfigId: 'kube8pwd')
-                }
+               script{
+                   
+                   def SonarQubecredentialsId = 'sonarqube-api'
+                   statiCodeAnalysis(SonarQubecredentialsId)
+               }
             }
         }
+        stage('Quality Gate Status Check : Sonarqube'){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   def SonarQubecredentialsId = 'sonarqube-api'
+                   QualityGateStatus(SonarQubecredentialsId)
+               }
+            }
+        }
+        stage('Maven Build : maven'){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   mvnBuild()
+               }
+            }
+        }
+        stage('Docker Image Build'){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   dockerBuild("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
+               }
+            }
+        }
+         stage('Docker Image Scan: trivy '){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   dockerImageScan("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
+               }
+            }
+        }
+        stage('Docker Image Push : DockerHub '){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   dockerImagePush("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
+               }
+            }
+        }   
+        stage('Docker Image Cleanup : DockerHub '){
+         when { expression {  params.action == 'create' } }
+            steps{
+               script{
+                   
+                   dockerImageCleanup("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
+               }
+            }
+        }      
     }
 }
